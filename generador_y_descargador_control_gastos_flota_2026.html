@@ -1,0 +1,1520 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard Control de Gastos de Flota 2026 - OT S.A.</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- ExcelJS para generar el archivo .xlsx con fórmulas nativas y formatos -->
+  <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
+  <!-- FileSaver.js para descarga directa en el navegador -->
+  <script src="https://cdn.jsdelivr.net/npm/file-saver@2.0.5/dist/FileSaver.min.js"></script>
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Segoe+UI:wght@400;600;700&family=Inter:wght@400;500;600;700&display=swap');
+    body {
+      font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
+    }
+    .font-excel {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #f1f5f9;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #94a3b8;
+    }
+  </style>
+</head>
+<body class="bg-slate-100 text-slate-800 min-h-screen flex flex-col antialiased">
+
+  <header class="bg-[#1F497D] text-white shadow-md sticky top-0 z-50">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex flex-wrap items-center justify-between gap-3">
+      <div class="flex items-center space-x-3">
+        <div class="bg-white/10 p-2 rounded-lg border border-white/20 shadow-inner">
+          <i data-lucide="truck" class="w-6 h-6 text-sky-200"></i>
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <h1 class="text-base sm:text-lg font-bold tracking-tight">OT S.A.</h1>
+            <span class="bg-sky-500/30 text-sky-200 text-[10px] font-semibold px-2 py-0.5 rounded-full border border-sky-400/30">Odoo Flota 2026</span>
+          </div>
+          <p class="text-xs text-blue-200">Control de Gastos de Flota, Odómetros y Mantenimiento</p>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-2.5">
+        <!-- Switch de vistas -->
+        <div class="bg-white/10 p-1 rounded-lg flex items-center border border-white/15 text-xs font-semibold">
+          <button id="tabBtnDashboard" class="px-3 py-1.5 rounded-md transition bg-white text-[#1F497D] shadow-sm flex items-center gap-1.5">
+            <i data-lucide="layout-dashboard" class="w-3.5 h-3.5"></i>
+            <span>Dashboard</span>
+          </button>
+          <button id="tabBtnExcelView" class="px-3 py-1.5 rounded-md transition text-white hover:bg-white/10 flex items-center gap-1.5">
+            <i data-lucide="table-2" class="w-3.5 h-3.5"></i>
+            <span>Hojas Excel (14)</span>
+          </button>
+        </div>
+
+        <label for="csvFileInput" class="inline-flex items-center gap-1.5 px-3 py-2 bg-white/15 hover:bg-white/25 text-white text-xs font-semibold rounded-lg cursor-pointer transition border border-white/20">
+          <i data-lucide="upload-cloud" class="w-4 h-4"></i>
+          <span class="hidden sm:inline">Cargar Archivo (CSV/Excel)</span>
+          <input type="file" id="csvFileInput" accept=".csv, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel" class="hidden" />
+        </label>
+        
+        <button id="btnOpenDriveModal" class="inline-flex items-center gap-1.5 px-3 py-2 bg-sky-600 hover:bg-sky-500 active:bg-sky-700 text-white text-xs font-semibold rounded-lg shadow-sm transition border border-sky-500/50">
+          <i data-lucide="cloud-download" class="w-4 h-4"></i>
+          <span class="hidden sm:inline">Drive / Sheets</span>
+        </button>
+
+        <button id="btnDownloadExcel" class="inline-flex items-center gap-2 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white text-xs font-bold rounded-lg shadow-sm transition transform hover:-translate-y-0.5">
+          <i data-lucide="file-spreadsheet" class="w-4 h-4"></i>
+          <span>Descargar .xlsx</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Modal Drive -->
+  <div id="driveModal" class="hidden fixed inset-0 bg-slate-900/50 z-[60] flex items-center justify-center p-4">
+    <div class="bg-white rounded-xl shadow-xl max-w-md w-full p-5 space-y-4">
+      <h3 class="text-lg font-bold text-slate-800 flex items-center gap-2">
+        <i data-lucide="cloud-download" class="w-5 h-5 text-sky-600"></i> Importar de Google Sheets
+      </h3>
+      <p class="text-xs text-slate-500 leading-relaxed">
+        Pega el enlace de tu documento de Google Sheets. Asegúrate de que el archivo esté <strong>Publicado en la web</strong> (Archivo > Compartir > Publicar en la web) seleccionando el formato <strong>Valores separados por comas (.csv)</strong>.
+      </p>
+      <input type="url" id="driveUrlInput" placeholder="https://docs.google.com/spreadsheets/.../pub?output=csv" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-sky-500 focus:ring-1 focus:ring-sky-500">
+      <div class="flex justify-end gap-2 pt-2">
+        <button onclick="document.getElementById('driveModal').classList.add('hidden')" class="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg transition">Cancelar</button>
+        <button id="btnLoadDrive" class="px-4 py-2 text-xs font-bold text-white bg-sky-600 hover:bg-sky-700 rounded-lg transition">Cargar Datos</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Notificación Informativa -->
+  <div class="max-w-7xl w-full mx-auto px-4 sm:px-6 pt-4">
+    <div id="statusToast" class="bg-blue-50 border-l-4 border-[#1F497D] p-3.5 rounded-r-lg shadow-sm flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <i data-lucide="info" class="w-5 h-5 text-[#1F497D] flex-shrink-0"></i>
+        <div>
+          <span class="text-xs font-bold text-slate-800" id="toastTitle">Modelo Oficial 2026 Activo</span>
+          <span class="text-xs text-slate-600 block sm:inline sm:ml-2" id="toastDesc">Puedes interactuar con los indicadores, revisar las 14 hojas o descargar directamente el archivo Excel listo para Microsoft Excel.</span>
+        </div>
+      </div>
+      <button onclick="document.getElementById('statusToast').style.display='none'" class="text-slate-400 hover:text-slate-600 p-1">
+        <i data-lucide="x" class="w-4 h-4"></i>
+      </button>
+    </div>
+  </div>
+
+  <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-4 space-y-6">
+
+    <!-- SECCIÓN 1: VISTA DASHBOARD GERENCIAL -->
+    <div id="viewDashboard" class="space-y-6">
+      <!-- Tarjetas KPI -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
+          <div>
+            <p class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Gasto Total Acumulado</p>
+            <h3 class="text-xl sm:text-2xl font-extrabold text-slate-800 mt-1" id="kpiTotalExpense">Gs. 0</h3>
+            <p class="text-xs text-emerald-600 font-medium mt-1 flex items-center gap-1">
+              <i data-lucide="trending-up" class="w-3.5 h-3.5"></i>
+              <span>Consolidado Anual 2026</span>
+            </p>
+          </div>
+          <div class="w-12 h-12 bg-blue-50 rounded-xl flex items-center justify-center text-[#1F497D]">
+            <i data-lucide="coins" class="w-6 h-6"></i>
+          </div>
+        </div>
+
+        <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
+          <div>
+            <p class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Kilómetros Recorridos</p>
+            <h3 class="text-xl sm:text-2xl font-extrabold text-slate-800 mt-1" id="kpiTotalKm">0 km</h3>
+            <p class="text-xs text-sky-600 font-medium mt-1 flex items-center gap-1">
+              <i data-lucide="gauge" class="w-3.5 h-3.5"></i>
+              <span>Odómetro acumulado flota</span>
+            </p>
+          </div>
+          <div class="w-12 h-12 bg-sky-50 rounded-xl flex items-center justify-center text-sky-700">
+            <i data-lucide="milestone" class="w-6 h-6"></i>
+          </div>
+        </div>
+
+        <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
+          <div>
+            <p class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Costo Operativo Promedio</p>
+            <h3 class="text-xl sm:text-2xl font-extrabold text-slate-800 mt-1" id="kpiCostPerKm">Gs. 0/km</h3>
+            <p class="text-xs text-slate-500 font-medium mt-1 flex items-center gap-1">
+              <i data-lucide="calculator" class="w-3.5 h-3.5"></i>
+              <span>Combustible + Mantenimiento</span>
+            </p>
+          </div>
+          <div class="w-12 h-12 bg-indigo-50 rounded-xl flex items-center justify-center text-indigo-700">
+            <i data-lucide="percent" class="w-6 h-6"></i>
+          </div>
+        </div>
+
+        <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
+          <div>
+            <p class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Flota & Equipos Activos</p>
+            <h3 class="text-xl sm:text-2xl font-extrabold text-slate-800 mt-1" id="kpiFleetCount">0</h3>
+            <p class="text-xs text-emerald-600 font-medium mt-1 flex items-center gap-1">
+              <i data-lucide="check-circle" class="w-3.5 h-3.5"></i>
+              <span>100% Monitoreados</span>
+            </p>
+          </div>
+          <div class="w-12 h-12 bg-emerald-50 rounded-xl flex items-center justify-center text-emerald-700">
+            <i data-lucide="truck" class="w-6 h-6"></i>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Gráfico de barras mensual -->
+        <div class="lg:col-span-2 bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex flex-col">
+          <div class="flex items-center justify-between mb-4">
+            <div>
+              <h3 class="text-sm font-bold text-slate-800">Evolución de Gastos Mensuales (2026)</h3>
+              <p class="text-xs text-slate-500">Distribución de egresos de Enero a Diciembre</p>
+            </div>
+            <span class="text-xs font-semibold px-2.5 py-1 bg-slate-100 text-slate-700 rounded-lg">Moneda: Guaraníes (PYG)</span>
+          </div>
+          
+          <div class="flex-1 flex items-end justify-between gap-1.5 sm:gap-3 h-56 pt-4 pb-2 px-2 border-b border-slate-100" id="monthlyBarsContainer">
+            <!-- Barras generadas por JS -->
+          </div>
+          <div class="flex justify-between items-center text-[10px] text-slate-400 font-semibold px-2 pt-2" id="monthlyLabelsContainer">
+            <!-- Etiquetas de meses -->
+          </div>
+        </div>
+
+        <!-- Desglose por categoría -->
+        <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between">
+          <div>
+            <h3 class="text-sm font-bold text-slate-800 mb-1">Distribución por Tipo de Gasto</h3>
+            <p class="text-xs text-slate-500 mb-4">Porcentaje sobre el total de la flota</p>
+            <div class="space-y-3" id="categoriesBreakdownContainer">
+              <!-- Desglose inyectado por JS -->
+            </div>
+          </div>
+          <div class="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
+            <span>Control de Proveedores:</span>
+            <span class="font-bold text-emerald-600" id="kpiFacturaProvStatus">0 Pendientes</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tabla de ranking de costos por vehículo -->
+      <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+        <div class="p-4 border-b border-slate-100 flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <h3 class="text-sm font-bold text-slate-800">Resumen y Desempeño por Vehículo</h3>
+            <p class="text-xs text-slate-500">Gasto total anual acumulado, kilometraje y costo promedio por kilómetro</p>
+          </div>
+          <span class="text-xs text-slate-400 font-medium">Ordenado por costo acumulado</span>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-xs text-left">
+            <thead class="bg-slate-50 text-slate-600 uppercase font-semibold text-[10px] tracking-wider border-b border-slate-200">
+              <tr>
+                <th class="py-3 px-4">Matrícula</th>
+                <th class="py-3 px-4">Responsable</th>
+                <th class="py-3 px-4">Vehículo / Equipo</th>
+                <th class="py-3 px-4 text-center">Año</th>
+                <th class="py-3 px-4 text-right">Km Recorridos</th>
+                <th class="py-3 px-4 text-right">Combustible</th>
+                <th class="py-3 px-4 text-right">Mantenimiento</th>
+                <th class="py-3 px-4 text-right">Gasto Total</th>
+                <th class="py-3 px-4 text-right">Gs./Km</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100" id="fleetSummaryTableBody">
+              <!-- Filas inyectadas dinámicamente -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- SECCIÓN 2: VISTA DETALLADA DE LAS 13 HOJAS DE EXCEL -->
+    <div id="viewExcel" class="hidden space-y-4">
+      <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+        
+        <!-- Pestañas de las 13 hojas -->
+        <div class="bg-slate-50 border-b border-slate-200 px-3 pt-2.5 flex items-center gap-1 overflow-x-auto" id="sheetTabsContainer">
+          <!-- Generado dinámicamente con JS -->
+        </div>
+
+        <div class="p-4 sm:p-5 overflow-x-auto">
+          <div class="flex items-center justify-between mb-3 pb-2 border-b border-slate-100">
+            <div>
+              <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400">Previsualizador Fiel a Microsoft Excel</span>
+              <h3 class="text-base font-bold text-slate-800" id="currentSheetHeading">Tipos de Servicio</h3>
+            </div>
+            <div class="flex items-center gap-2">
+              <span class="text-xs text-slate-500" id="sheetMetaInfo">2 columnas • 8 categorías oficiales</span>
+              <button id="btnQuickExport" class="p-1.5 hover:bg-slate-100 text-slate-600 rounded-md transition" title="Descargar libro actual">
+                <i data-lucide="download" class="w-4 h-4"></i>
+              </button>
+            </div>
+          </div>
+
+          <!-- Tabla renderizada según formato Excel -->
+          <div id="tablePreviewContainer" class="border border-slate-300 rounded overflow-hidden shadow-inner bg-slate-50 min-h-[350px]">
+            <!-- Inyectado por JS -->
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <footer class="bg-white border-t border-slate-200 py-3 text-center text-xs text-slate-500">
+    OT S.A. — Sistema Integrado de Control de Flota y Mantenimiento Odoo 2026
+  </footer>
+
+  <script>
+    // Catálogo oficial de tipos de servicio
+    const SERVICE_TYPES_CATALOG = [
+      ["Combustible con tarjeta flota", "Se utilizará para registrar las cargas realizadas con el proveedor o tarjeta de flota, permitiendo llevar correctamente el control de combustible."],
+      ["Combustible sin tarjeta flota", "Registrar cargas realizadas fuera de la tarjeta de flota, por ejemplo caja chica u otros proveedores, permitiendo diferenciarlas de las cargas habituales."],
+      ["Factura de proveedor", "Este tipo debe utilizarse solamente como control temporal. Si existen movimientos aquí, significa que todavía falta realizar la clasificación correspondiente."],
+      ["Insumos varios", "Utilizar para gastos como lavado, gomería, pequeños accesorios, insumos y otros gastos relacionados con el vehículo/equipo."],
+      ["Mantenimiento Preventivo", "Registrar los mantenimientos programados realizados según kilometraje, horas de uso o periodicidad establecida."],
+      ["Mantenimiento correctivo", "Registrar gastos que surgen fuera del mantenimiento preventivo, como fluidos, reparaciones menores, cambios extraordinarios, etc."],
+      ["Reparacion en taller", "Registrar los ingresos del vehículo/equipo al taller, permitiendo conocer cuántas veces ingresó y mantener trazabilidad de las reparaciones realizadas."],
+      ["Seguridad y Monitoreo", "Registrar gastos relacionados con GPS, monitoreo, seguridad y servicios similares."]
+    ];
+
+    const MONTH_NAMES = [
+      "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+      "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"
+    ];
+
+    const DAYS_IN_MONTH_2026 = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+
+    // Datos iniciales vacíos para que no muestre meses sin registros
+    let fleetMaster = [];
+    let monthlyFleetData = {};
+    for (let m = 1; m <= 12; m++) {
+      monthlyFleetData[m] = {};
+    }
+
+    let currentTab = "Tipos de Servicio";
+
+    function formatMoney(num) {
+      return Math.round(num || 0).toLocaleString('es-PY');
+    }
+
+    function formatDecimals(num) {
+      return Number(num || 0).toLocaleString('es-PY', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
+    function updateDashboardView() {
+      let totalAnnualExpense = 0;
+      let totalAnnualKm = 0;
+      let totalCombustible = 0;
+      let totalMantenimiento = 0;
+      let monthlyTotals = Array(12).fill(0);
+
+      const vehicleTotals = {};
+      fleetMaster.forEach(v => {
+        vehicleTotals[v.plate] = {
+          plate: v.plate,
+          driver: v.driver,
+          model: v.model,
+          year: v.year,
+          kmTotal: 0,
+          combustible: 0,
+          mantenimiento: 0,
+          total: 0
+        };
+      });
+
+      for (let m = 1; m <= 12; m++) {
+        let monthSum = 0;
+        fleetMaster.forEach(v => {
+          const d = monthlyFleetData[m][v.plate] || {
+            combustible: 0, combustibleSinTarjeta: 0, mPrev: 0, mCorrec: 0,
+            reparaciones: 0, insumos: 0, seguridad: 0, facturaProveedor: 0,
+            kmIni: 0, kmFin: 0
+          };
+
+          const kmRec = Math.max(0, d.kmFin - d.kmIni);
+          const comb = d.combustible + d.combustibleSinTarjeta;
+          const mant = d.mPrev + d.mCorrec + d.reparaciones + d.insumos + d.seguridad + d.facturaProveedor;
+          const gTotal = comb + mant;
+
+          monthSum += gTotal;
+          totalAnnualKm += kmRec;
+          totalCombustible += comb;
+          totalMantenimiento += mant;
+
+          vehicleTotals[v.plate].kmTotal += kmRec;
+          vehicleTotals[v.plate].combustible += comb;
+          vehicleTotals[v.plate].mantenimiento += mant;
+          vehicleTotals[v.plate].total += gTotal;
+        });
+        monthlyTotals[m - 1] = monthSum;
+        totalAnnualExpense += monthSum;
+      }
+
+      // KPIs
+      document.getElementById("kpiTotalExpense").textContent = `Gs. ${formatMoney(totalAnnualExpense)}`;
+      document.getElementById("kpiTotalKm").textContent = `${formatMoney(totalAnnualKm)} km`;
+      const avgCostKm = totalAnnualKm > 0 ? (totalAnnualExpense / totalAnnualKm) : 0;
+      document.getElementById("kpiCostPerKm").textContent = `Gs. ${formatDecimals(avgCostKm)}/km`;
+      document.getElementById("kpiFleetCount").textContent = fleetMaster.length;
+
+      // Gráfico de Barras Mensual
+      const maxVal = Math.max(...monthlyTotals, 1);
+      const barsCont = document.getElementById("monthlyBarsContainer");
+      const labelsCont = document.getElementById("monthlyLabelsContainer");
+      barsCont.innerHTML = "";
+      labelsCont.innerHTML = "";
+
+      MONTH_NAMES.forEach((mName, idx) => {
+        const val = monthlyTotals[idx];
+        const heightPct = Math.max(10, Math.round((val / maxVal) * 100));
+
+        const barWrapper = document.createElement("div");
+        barWrapper.className = "flex-1 flex flex-col items-center h-full justify-end group relative";
+        barWrapper.innerHTML = `
+          <div class="absolute -top-7 hidden group-hover:flex px-2 py-1 bg-slate-900 text-white text-[10px] rounded shadow whitespace-nowrap z-10 font-mono">
+            ${mName}: Gs. ${formatMoney(val)}
+          </div>
+          <div class="w-full max-w-[28px] bg-gradient-to-t from-[#1F497D] to-[#2E75B6] hover:to-sky-400 rounded-t transition-all duration-300 shadow-sm" style="height: ${heightPct}%"></div>
+        `;
+        barsCont.appendChild(barWrapper);
+
+        const lbl = document.createElement("span");
+        lbl.className = "flex-1 text-center truncate";
+        lbl.textContent = mName.substring(0, 3);
+        labelsCont.appendChild(lbl);
+      });
+
+      const pctComb = totalAnnualExpense > 0 ? Math.round((totalCombustible / totalAnnualExpense) * 100) : 0;
+      const pctMant = totalAnnualExpense > 0 ? Math.round((totalMantenimiento / totalAnnualExpense) * 100) : 0;
+
+      const catContainer = document.getElementById("categoriesBreakdownContainer");
+      catContainer.innerHTML = `
+        <div>
+          <div class="flex justify-between text-xs mb-1">
+            <span class="font-semibold text-slate-700">Combustible Flota y Efectivo</span>
+            <span class="font-bold text-slate-900">${pctComb}% (Gs. ${formatMoney(totalCombustible)})</span>
+          </div>
+          <div class="w-full bg-slate-100 h-2.5 rounded-full overflow-hidden">
+            <div class="bg-[#1F497D] h-full rounded-full" style="width: ${pctComb}%"></div>
+          </div>
+        </div>
+        <div>
+          <div class="flex justify-between text-xs mb-1">
+            <span class="font-semibold text-slate-700">Mantenimiento y Reparaciones</span>
+            <span class="font-bold text-slate-900">${pctMant}% (Gs. ${formatMoney(totalMantenimiento)})</span>
+          </div>
+          <div class="w-full bg-slate-100 h-2.5 rounded-full overflow-hidden">
+            <div class="bg-sky-500 h-full rounded-full" style="width: ${pctMant}%"></div>
+          </div>
+        </div>
+      `;
+
+      // Tabla Resumen Vehículos
+      const tbody = document.getElementById("fleetSummaryTableBody");
+      tbody.innerHTML = "";
+      const sortedVehicles = Object.values(vehicleTotals).sort((a, b) => b.total - a.total);
+
+      sortedVehicles.forEach((veh, idx) => {
+        const costPerKm = veh.kmTotal > 0 ? (veh.total / veh.kmTotal) : 0;
+        const tr = document.createElement("tr");
+        tr.className = "hover:bg-slate-50 transition border-b border-slate-100";
+        tr.innerHTML = `
+          <td class="py-2.5 px-4 font-bold text-[#1F497D]">${veh.plate}</td>
+          <td class="py-2.5 px-4 text-slate-700 font-medium">${veh.driver}</td>
+          <td class="py-2.5 px-4 text-slate-600">${veh.model}</td>
+          <td class="py-2.5 px-4 text-center text-slate-500">${veh.year}</td>
+          <td class="py-2.5 px-4 text-right font-mono">${formatMoney(veh.kmTotal)} km</td>
+          <td class="py-2.5 px-4 text-right font-mono">Gs. ${formatMoney(veh.combustible)}</td>
+          <td class="py-2.5 px-4 text-right font-mono">Gs. ${formatMoney(veh.mantenimiento)}</td>
+          <td class="py-2.5 px-4 text-right font-bold text-slate-900 font-mono">Gs. ${formatMoney(veh.total)}</td>
+          <td class="py-2.5 px-4 text-right font-semibold text-indigo-700 font-mono">Gs. ${formatDecimals(costPerKm)}</td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    const btnTabDashboard = document.getElementById("tabBtnDashboard");
+    const btnTabExcelView = document.getElementById("tabBtnExcelView");
+    const viewDashboard = document.getElementById("viewDashboard");
+    const viewExcel = document.getElementById("viewExcel");
+
+    btnTabDashboard.addEventListener("click", () => {
+      viewDashboard.classList.remove("hidden");
+      viewExcel.classList.add("hidden");
+      btnTabDashboard.className = "px-3 py-1.5 rounded-md transition bg-white text-[#1F497D] shadow-sm flex items-center gap-1.5";
+      btnTabExcelView.className = "px-3 py-1.5 rounded-md transition text-white hover:bg-white/10 flex items-center gap-1.5";
+      updateDashboardView();
+      lucide.createIcons();
+    });
+
+    btnTabExcelView.addEventListener("click", () => {
+      viewDashboard.classList.add("hidden");
+      viewExcel.classList.remove("hidden");
+      btnTabExcelView.className = "px-3 py-1.5 rounded-md transition bg-white text-[#1F497D] shadow-sm flex items-center gap-1.5";
+      btnTabDashboard.className = "px-3 py-1.5 rounded-md transition text-white hover:bg-white/10 flex items-center gap-1.5";
+      renderTabs();
+      renderPreview();
+      lucide.createIcons();
+    });
+
+    function renderTabs() {
+      const container = document.getElementById("sheetTabsContainer");
+      container.innerHTML = "";
+
+      const tabs = ["Tipos de Servicio", ...MONTH_NAMES, "Acumulado"];
+      tabs.forEach(tab => {
+        const btn = document.createElement("button");
+        const isActive = currentTab === tab;
+        btn.className = `px-3 py-1.5 text-xs font-semibold rounded-t-lg transition whitespace-nowrap border-t-2 ${
+          isActive 
+            ? "bg-white text-[#1F497D] border-[#1F497D] shadow-sm" 
+            : "text-slate-600 hover:text-slate-900 border-transparent hover:bg-slate-100"
+        }`;
+        btn.textContent = tab;
+        btn.onclick = () => {
+          currentTab = tab;
+          renderTabs();
+          renderPreview();
+        };
+        container.appendChild(btn);
+      });
+    }
+
+    function renderPreview() {
+      const container = document.getElementById("tablePreviewContainer");
+      const heading = document.getElementById("currentSheetHeading");
+      const meta = document.getElementById("sheetMetaInfo");
+
+      heading.textContent = currentTab;
+
+      if (currentTab === "Tipos de Servicio") {
+        meta.textContent = "2 columnas • 8 categorías oficiales";
+        let html = `
+          <div class="p-3 bg-white overflow-x-auto">
+            <div class="bg-[#1F497D] text-white text-center py-2 px-4 font-bold text-sm rounded-t font-excel">
+              TIPOS DE SERVICIO DE FLOTA
+            </div>
+            <div class="bg-[#2C598C] text-white text-center py-1 px-4 text-xs italic font-excel">
+              Categorías oficiales del catálogo Odoo / Excel de referencia
+            </div>
+            <table class="w-full text-left text-xs border border-slate-300 font-excel mt-2">
+              <thead class="bg-[#D9E1F2] text-[#1F497D] font-bold">
+                <tr>
+                  <th class="p-2.5 border border-slate-300 w-1/3">Nombre / Tipo de Servicio</th>
+                  <th class="p-2.5 border border-slate-300">Descripción / Indicación de uso</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-slate-200">
+        `;
+        SERVICE_TYPES_CATALOG.forEach(([name, desc]) => {
+          html += `
+            <tr class="hover:bg-slate-50">
+              <td class="p-2.5 font-bold text-[#1F497D] border border-slate-300 align-top">${name}</td>
+              <td class="p-2.5 text-slate-700 border border-slate-300 align-top leading-relaxed">${desc}</td>
+            </tr>
+          `;
+        });
+        html += `</tbody></table></div>`;
+        container.innerHTML = html;
+        return;
+      }
+
+      // Vistas mensuales o Acumulado
+      const isAcumulado = currentTab === "Acumulado";
+      const monthIdx = isAcumulado ? 0 : MONTH_NAMES.indexOf(currentTab) + 1;
+      const daysInMonth = isAcumulado ? 365 : DAYS_IN_MONTH_2026[monthIdx - 1];
+      
+      if (isAcumulado) {
+        meta.textContent = `18 columnas • ${fleetMaster.length} vehículos/equipos • Consolidado Anual`;
+      } else {
+        meta.textContent = `18 columnas • ${fleetMaster.length} vehículos/equipos • Fechas 01 al ${daysInMonth}`;
+      }
+
+      let totalComb = 0, totalCombSin = 0, totalMPrev = 0, totalMCorrec = 0;
+      let totalRep = 0, totalIns = 0, totalSeg = 0, totalFactProv = 0, totalKmRecorrido = 0;
+
+      let rowsHtml = "";
+      fleetMaster.forEach((veh, idx) => {
+        let d = {
+          combustible: 0, combustibleSinTarjeta: 0, mPrev: 0, mCorrec: 0,
+          reparaciones: 0, insumos: 0, seguridad: 0, facturaProveedor: 0,
+          kmIni: 0, kmFin: 0
+        };
+
+        if (isAcumulado) {
+            let kmMin = Infinity, kmMax = -Infinity;
+            for (let m = 1; m <= 12; m++) {
+                const md = monthlyFleetData[m][veh.plate];
+                if (md) {
+                    d.combustible += md.combustible || 0;
+                    d.combustibleSinTarjeta += md.combustibleSinTarjeta || 0;
+                    d.mPrev += md.mPrev || 0;
+                    d.mCorrec += md.mCorrec || 0;
+                    d.reparaciones += md.reparaciones || 0;
+                    d.insumos += md.insumos || 0;
+                    d.seguridad += md.seguridad || 0;
+                    d.facturaProveedor += md.facturaProveedor || 0;
+                    if (md.kmIni > 0 && md.kmIni < kmMin) kmMin = md.kmIni;
+                    if (md.kmFin > 0 && md.kmFin > kmMax) kmMax = md.kmFin;
+                }
+            }
+            if (kmMin !== Infinity) d.kmIni = kmMin;
+            if (kmMax !== -Infinity) d.kmFin = kmMax;
+        } else {
+            const md = monthlyFleetData[monthIdx][veh.plate];
+            if (md) d = md;
+        }
+
+        const kmRec = Math.max(0, d.kmFin - d.kmIni);
+        const costCombKm = kmRec > 0 ? (d.combustible + d.combustibleSinTarjeta) / kmRec : 0;
+        const costMantKm = kmRec > 0 ? (d.mPrev + d.mCorrec + d.reparaciones + d.insumos + d.seguridad + d.facturaProveedor) / kmRec : 0;
+        const costTotalKm = costCombKm + costMantKm;
+
+        totalComb += d.combustible;
+        totalCombSin += d.combustibleSinTarjeta;
+        totalMPrev += d.mPrev;
+        totalMCorrec += d.mCorrec;
+        totalRep += d.reparaciones;
+        totalIns += d.insumos;
+        totalSeg += d.seguridad;
+        totalFactProv += d.facturaProveedor;
+        totalKmRecorrido += kmRec;
+
+        const zebraClass = idx % 2 === 1 ? "bg-[#F9FAFC]" : "bg-white";
+
+        rowsHtml += `
+          <tr class="${zebraClass} hover:bg-blue-50/50 text-slate-800 text-[11px] font-excel">
+            <td class="p-1.5 text-center font-semibold border border-slate-300">${veh.plate}</td>
+            <td class="p-1.5 text-left border border-slate-300 truncate max-w-[140px]">${veh.driver}</td>
+            <td class="p-1.5 text-left border border-slate-300 truncate max-w-[180px]">${veh.model}</td>
+            <td class="p-1.5 text-center border border-slate-300">${veh.year}</td>
+            <td class="p-1.5 text-right border border-slate-300">${formatMoney(d.combustible)}</td>
+            <td class="p-1.5 text-right border border-slate-300">${formatMoney(d.combustibleSinTarjeta)}</td>
+            <td class="p-1.5 text-right border border-slate-300">${formatMoney(d.mPrev)}</td>
+            <td class="p-1.5 text-right border border-slate-300">${formatMoney(d.mCorrec)}</td>
+            <td class="p-1.5 text-right border border-slate-300">${formatMoney(d.reparaciones)}</td>
+            <td class="p-1.5 text-right border border-slate-300">${formatMoney(d.insumos)}</td>
+            <td class="p-1.5 text-right border border-slate-300">${formatMoney(d.seguridad)}</td>
+            <td class="p-1.5 text-right border border-slate-300">${formatMoney(d.facturaProveedor)}</td>
+            <td class="p-1.5 text-right border border-slate-300">${formatMoney(d.kmIni)}</td>
+            <td class="p-1.5 text-right border border-slate-300">${formatMoney(d.kmFin)}</td>
+            <td class="p-1.5 text-right border border-slate-300 font-semibold bg-slate-50">${formatMoney(kmRec)}</td>
+            <td class="p-1.5 text-right border border-slate-300">${formatDecimals(costCombKm)}</td>
+            <td class="p-1.5 text-right border border-slate-300">${formatDecimals(costMantKm)}</td>
+            <td class="p-1.5 text-right border border-slate-300 font-bold text-slate-900 bg-blue-50/40">${formatDecimals(costTotalKm)}</td>
+          </tr>
+        `;
+      });
+
+      const totalCostCombKm = totalKmRecorrido > 0 ? (totalComb + totalCombSin) / totalKmRecorrido : 0;
+      const totalCostMantKm = totalKmRecorrido > 0 ? (totalMPrev + totalMCorrec + totalRep + totalIns + totalSeg + totalFactProv) / totalKmRecorrido : 0;
+      const totalCostTotalKm = totalCostCombKm + totalCostMantKm;
+
+      const periodText = isAcumulado ? "Consolidado Anual 2026 | OT S.A." : `Período del 01-${String(monthIdx).padStart(2, '0')}-2026 al ${daysInMonth}-${String(monthIdx).padStart(2, '0')}-2026 | OT S.A.`;
+
+      let html = `
+        <div class="p-3 bg-white">
+          <div class="bg-[#1F497D] text-white text-center py-2 px-4 font-bold text-sm tracking-wide font-excel">
+            REPORTE CONTROL DE GASTOS DE FLOTA - ${currentTab.toUpperCase()} 2026
+          </div>
+          <div class="bg-[#2C598C] text-white text-center py-1 px-4 text-xs italic font-excel">
+            ${periodText}
+          </div>
+          <div class="overflow-x-auto mt-2">
+            <table class="w-full text-xs border-collapse font-excel border border-slate-300">
+              <thead class="bg-[#D9E1F2] text-[#1F497D] font-bold text-[11px] text-center">
+                <tr>
+                  <th class="p-1.5 border border-slate-300">Matrícula</th>
+                  <th class="p-1.5 border border-slate-300">Responsable</th>
+                  <th class="p-1.5 border border-slate-300">Vehículo / Modelo</th>
+                  <th class="p-1.5 border border-slate-300">Año</th>
+                  <th class="p-1.5 border border-slate-300">Combustible</th>
+                  <th class="p-1.5 border border-slate-300">Comb. Sin Tarjeta</th>
+                  <th class="p-1.5 border border-slate-300">M. Prev.</th>
+                  <th class="p-1.5 border border-slate-300">M. Correc.</th>
+                  <th class="p-1.5 border border-slate-300">Reparaciones</th>
+                  <th class="p-1.5 border border-slate-300">Insumos</th>
+                  <th class="p-1.5 border border-slate-300">Seguridad</th>
+                  <th class="p-1.5 border border-slate-300">Fact. Prov.</th>
+                  <th class="p-1.5 border border-slate-300">Km Inicial</th>
+                  <th class="p-1.5 border border-slate-300">Km Final</th>
+                  <th class="p-1.5 border border-slate-300">Km Recorrido</th>
+                  <th class="p-1.5 border border-slate-300">Costo Comb/Km</th>
+                  <th class="p-1.5 border border-slate-300">Costo Mant/Km</th>
+                  <th class="p-1.5 border border-slate-300">Costo Total/km</th>
+                </tr>
+                <tr class="bg-[#2E75B6] text-white font-bold text-xs">
+                  <th colspan="18" class="py-1.5 text-center tracking-wider border border-slate-300">
+                    FLOTA Y EQUIPOS OT
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                ${rowsHtml}
+              </tbody>
+              <tfoot class="bg-[#BDD7EE] font-bold text-[#1F497D] text-[11px] border-t-2 border-slate-800">
+                <tr>
+                  <td colspan="4" class="p-1.5 text-center border border-slate-300 uppercase tracking-wide">
+                    TOTAL GENERAL
+                  </td>
+                  <td class="p-1.5 text-right border border-slate-300">${formatMoney(totalComb)}</td>
+                  <td class="p-1.5 text-right border border-slate-300">${formatMoney(totalCombSin)}</td>
+                  <td class="p-1.5 text-right border border-slate-300">${formatMoney(totalMPrev)}</td>
+                  <td class="p-1.5 text-right border border-slate-300">${formatMoney(totalMCorrec)}</td>
+                  <td class="p-1.5 text-right border border-slate-300">${formatMoney(totalRep)}</td>
+                  <td class="p-1.5 text-right border border-slate-300">${formatMoney(totalIns)}</td>
+                  <td class="p-1.5 text-right border border-slate-300">${formatMoney(totalSeg)}</td>
+                  <td class="p-1.5 text-right border border-slate-300">${formatMoney(totalFactProv)}</td>
+                  <td class="p-1.5 text-right border border-slate-300">-</td>
+                  <td class="p-1.5 text-right border border-slate-300">-</td>
+                  <td class="p-1.5 text-right border border-slate-300">${formatMoney(totalKmRecorrido)}</td>
+                  <td class="p-1.5 text-right border border-slate-300">${formatDecimals(totalCostCombKm)}</td>
+                  <td class="p-1.5 text-right border border-slate-300">${formatDecimals(totalCostMantKm)}</td>
+                  <td class="p-1.5 text-right border border-slate-300 text-slate-900">${formatDecimals(totalCostTotalKm)}</td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </div>
+      `;
+      container.innerHTML = html;
+    }
+
+    async function generateAndDownloadExcel() {
+      const btn = document.getElementById("btnDownloadExcel");
+      const origText = btn.innerHTML;
+      btn.innerHTML = `<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i><span>Generando...</span>`;
+      btn.disabled = true;
+
+      try {
+        const workbook = new ExcelJS.Workbook();
+        workbook.creator = "OT S.A. - Odoo Fleet Analytics";
+        workbook.lastModifiedBy = "Especialista Odoo Flota";
+        workbook.created = new Date(2026, 0, 1);
+        workbook.modified = new Date();
+
+        const FONT_FAMILY = "Segoe UI";
+        const COLOR_PRIMARY_DARK = "FF1F497D";
+        const COLOR_PRIMARY_MEDIUM = "FF2E75B6";
+        const COLOR_HEADER_BG = "FFD9E1F2";
+        const COLOR_TOTAL_BG = "FFBDD7EE";
+        const COLOR_BORDER = "FFA6A6A6";
+        const COLOR_ZEBRA = "FFF9FAFC";
+
+        const thinBorder = {
+          top: { style: 'thin', color: { argb: COLOR_BORDER } },
+          left: { style: 'thin', color: { argb: COLOR_BORDER } },
+          bottom: { style: 'thin', color: { argb: COLOR_BORDER } },
+          right: { style: 'thin', color: { argb: COLOR_BORDER } }
+        };
+
+        const totalBorder = {
+          top: { style: 'thin', color: { argb: 'FF000000' } },
+          left: { style: 'thin', color: { argb: COLOR_BORDER } },
+          bottom: { style: 'double', color: { argb: 'FF000000' } },
+          right: { style: 'thin', color: { argb: COLOR_BORDER } }
+        };
+
+        // 1. Hoja: Tipos de Servicio
+        const wsTypes = workbook.addWorksheet("Tipos de Servicio", {
+          views: [{ showGridLines: true }]
+        });
+
+        wsTypes.mergeCells("A1:B1");
+        const a1 = wsTypes.getCell("A1");
+        a1.value = "TIPOS DE SERVICIO DE FLOTA";
+        a1.font = { name: FONT_FAMILY, size: 14, bold: true, color: { argb: "FFFFFFFF" } };
+        a1.fill = { type: "pattern", pattern: "solid", fgColor: { argb: COLOR_PRIMARY_DARK } };
+        a1.alignment = { horizontal: "center", vertical: "middle" };
+        wsTypes.getRow(1).height = 30;
+
+        wsTypes.mergeCells("A2:B2");
+        const a2 = wsTypes.getCell("A2");
+        a2.value = "Categorías oficiales del catálogo Odoo / Excel de referencia";
+        a2.font = { name: FONT_FAMILY, size: 10, italic: true, color: { argb: "FFFFFFFF" } };
+        a2.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF2C598C" } };
+        a2.alignment = { horizontal: "center", vertical: "middle" };
+        wsTypes.getRow(2).height = 20;
+
+        wsTypes.getRow(3).height = 10;
+
+        wsTypes.getCell("A4").value = "Nombre / Tipo de Servicio";
+        wsTypes.getCell("B4").value = "Descripción / Indicación de uso";
+        ["A4", "B4"].forEach(cellRef => {
+          const c = wsTypes.getCell(cellRef);
+          c.font = { name: FONT_FAMILY, size: 10, bold: true, color: { argb: "FF1F497D" } };
+          c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: COLOR_HEADER_BG } };
+          c.alignment = { horizontal: "left", vertical: "middle" };
+          c.border = thinBorder;
+        });
+        wsTypes.getRow(4).height = 24;
+
+        let curR = 5;
+        SERVICE_TYPES_CATALOG.forEach(([name, desc]) => {
+          const cellA = wsTypes.getCell(`A${curR}`);
+          const cellB = wsTypes.getCell(`B${curR}`);
+          cellA.value = name;
+          cellB.value = desc;
+
+          cellA.font = { name: FONT_FAMILY, size: 9, bold: true, color: { argb: "FF1F497D" } };
+          cellB.font = { name: FONT_FAMILY, size: 9, color: { argb: "FF333333" } };
+
+          cellA.alignment = { horizontal: "left", vertical: "middle" };
+          cellB.alignment = { horizontal: "left", vertical: "middle", wrapText: true };
+
+          cellA.border = thinBorder;
+          cellB.border = thinBorder;
+
+          wsTypes.getRow(curR).height = 32;
+          curR++;
+        });
+
+        wsTypes.getColumn("A").width = 34;
+        wsTypes.getColumn("B").width = 85;
+
+        for (let m = 1; m <= 12; m++) {
+          const monthName = MONTH_NAMES[m - 1];
+          const daysInMonth = DAYS_IN_MONTH_2026[m - 1];
+          const mStr = String(m).padStart(2, '0');
+
+          const ws = workbook.addWorksheet(monthName, {
+            views: [{ showGridLines: true, state: 'frozen', xSplit: 0, ySplit: 5 }]
+          });
+
+          // Fila 1: Título
+          ws.mergeCells("A1:R1");
+          const tCell = ws.getCell("A1");
+          tCell.value = `REPORTE CONTROL DE GASTOS DE FLOTA - ${monthName.toUpperCase()} 2026`;
+          tCell.font = { name: FONT_FAMILY, size: 14, bold: true, color: { argb: "FFFFFFFF" } };
+          tCell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: COLOR_PRIMARY_DARK } };
+          tCell.alignment = { horizontal: "center", vertical: "middle" };
+          ws.getRow(1).height = 30;
+
+          // Fila 2: Período
+          ws.mergeCells("A2:R2");
+          const sCell = ws.getCell("A2");
+          sCell.value = `Período del 01-${mStr}-2026 al ${daysInMonth}-${mStr}-2026 | OT S.A.`;
+          sCell.font = { name: FONT_FAMILY, size: 10, italic: true, color: { argb: "FFFFFFFF" } };
+          sCell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF2C598C" } };
+          sCell.alignment = { horizontal: "center", vertical: "middle" };
+          ws.getRow(2).height = 20;
+
+          ws.getRow(3).height = 8;
+
+          // Fila 4: Encabezados Oficiales
+          const headers = [
+            "Matrícula", "Responsable", "Vehículo / Modelo", "Año",
+            "Combustible", "Combustible Sin Tarjeta Flota", "M. Prev.", "M. Correc.",
+            "Reparaciones", "Insumos", "Seguridad y Monitoreo", "Factura de Proveedor",
+            "Km Inicial", "Km Final", "Km Recorrido", "Costo Comb/Km", "Costo Mant/Km", "Costo Total / km"
+          ];
+          ws.getRow(4).height = 28;
+          headers.forEach((hText, idx) => {
+            const cell = ws.getCell(4, idx + 1);
+            cell.value = hText;
+            cell.font = { name: FONT_FAMILY, size: 9, bold: true, color: { argb: "FF1F497D" } };
+            cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: COLOR_HEADER_BG } };
+            cell.alignment = { horizontal: "center", vertical: "middle", wrapText: true };
+            cell.border = thinBorder;
+          });
+
+          // Fila 5: Sección combinada FLOTA Y EQUIPOS OT
+          ws.mergeCells("A5:R5");
+          const secCell = ws.getCell("A5");
+          secCell.value = "FLOTA Y EQUIPOS OT";
+          secCell.font = { name: FONT_FAMILY, size: 11, bold: true, color: { argb: "FFFFFFFF" } };
+          secCell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: COLOR_PRIMARY_MEDIUM } };
+          secCell.alignment = { horizontal: "center", vertical: "middle" };
+          ws.getRow(5).height = 22;
+          for (let col = 1; col <= 18; col++) {
+            ws.getCell(5, col).border = thinBorder;
+          }
+
+          // Filas de vehículos
+          let vRow = 6;
+          fleetMaster.forEach((veh, idx) => {
+            const d = monthlyFleetData[m][veh.plate] || {
+              combustible: 0, combustibleSinTarjeta: 0, mPrev: 0, mCorrec: 0,
+              reparaciones: 0, insumos: 0, seguridad: 0, facturaProveedor: 0,
+              kmIni: 0, kmFin: 0
+            };
+
+            ws.getCell(`A${vRow}`).value = veh.plate;
+            ws.getCell(`B${vRow}`).value = veh.driver || "-";
+            ws.getCell(`C${vRow}`).value = veh.model || "-";
+            ws.getCell(`D${vRow}`).value = veh.year || "-";
+
+            ws.getCell(`E${vRow}`).value = d.combustible;
+            ws.getCell(`F${vRow}`).value = d.combustibleSinTarjeta;
+            ws.getCell(`G${vRow}`).value = d.mPrev;
+            ws.getCell(`H${vRow}`).value = d.mCorrec;
+            ws.getCell(`I${vRow}`).value = d.reparaciones;
+            ws.getCell(`J${vRow}`).value = d.insumos;
+            ws.getCell(`K${vRow}`).value = d.seguridad;
+            ws.getCell(`L${vRow}`).value = d.facturaProveedor;
+
+            ws.getCell(`M${vRow}`).value = d.kmIni;
+            ws.getCell(`N${vRow}`).value = d.kmFin;
+
+            // Fórmulas requeridas estrictamente
+            ws.getCell(`O${vRow}`).value = { formula: `MAX(0,N${vRow}-M${vRow})` };
+            ws.getCell(`P${vRow}`).value = { formula: `IF(O${vRow}>0,(E${vRow}+F${vRow})/O${vRow},0)` };
+            ws.getCell(`Q${vRow}`).value = { formula: `IF(O${vRow}>0,(G${vRow}+H${vRow}+I${vRow}+J${vRow}+K${vRow}+L${vRow})/O${vRow},0)` };
+            ws.getCell(`R${vRow}`).value = { formula: `P${vRow}+Q${vRow}` };
+
+            // Formatos y alineaciones
+            ws.getCell(`A${vRow}`).alignment = { horizontal: "center", vertical: "middle" };
+            ws.getCell(`B${vRow}`).alignment = { horizontal: "left", vertical: "middle" };
+            ws.getCell(`C${vRow}`).alignment = { horizontal: "left", vertical: "middle" };
+            ws.getCell(`D${vRow}`).alignment = { horizontal: "center", vertical: "middle" };
+
+            // Monedas E a L: separador de miles sin decimales
+            ["E", "F", "G", "H", "I", "J", "K", "L"].forEach(col => {
+              const c = ws.getCell(`${col}${vRow}`);
+              c.numFmt = '#,##0';
+              c.alignment = { horizontal: "right", vertical: "middle" };
+            });
+
+            // Odómetros M a O: separador de miles sin decimales
+            ["M", "N", "O"].forEach(col => {
+              const c = ws.getCell(`${col}${vRow}`);
+              c.numFmt = '#,##0';
+              c.alignment = { horizontal: "right", vertical: "middle" };
+            });
+
+            // Costos unitarios P a R: 2 decimales
+            ["P", "Q", "R"].forEach(col => {
+              const c = ws.getCell(`${col}${vRow}`);
+              c.numFmt = '#,##0.00';
+              c.alignment = { horizontal: "right", vertical: "middle" };
+            });
+
+            for (let c = 1; c <= 18; c++) {
+              const cell = ws.getCell(vRow, c);
+              cell.font = { name: FONT_FAMILY, size: 9, color: { argb: "FF000000" } };
+              cell.border = thinBorder;
+              if (idx % 2 === 1) {
+                cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: COLOR_ZEBRA } };
+              }
+            }
+
+            ws.getRow(vRow).height = 20;
+            vRow++;
+          });
+
+          const lastVRow = vRow - 1;
+          const totRow = vRow;
+
+          ws.mergeCells(`A${totRow}:D${totRow}`);
+          const totLabel = ws.getCell(`A${totRow}`);
+          totLabel.value = "TOTAL GENERAL";
+          totLabel.font = { name: FONT_FAMILY, size: 10, bold: true, color: { argb: "FF000000" } };
+          totLabel.alignment = { horizontal: "center", vertical: "middle" };
+
+          // Fórmulas de suma para columnas E a L
+          ["E", "F", "G", "H", "I", "J", "K", "L"].forEach(col => {
+            const cell = ws.getCell(`${col}${totRow}`);
+            cell.value = { formula: `SUM(${col}6:${col}${lastVRow})` };
+            cell.numFmt = '#,##0';
+            cell.font = { name: FONT_FAMILY, size: 10, bold: true };
+            cell.alignment = { horizontal: "right", vertical: "middle" };
+          });
+
+          // Odómetros M y N
+          ["M", "N"].forEach(col => {
+            const cell = ws.getCell(`${col}${totRow}`);
+            cell.value = { formula: `SUM(${col}6:${col}${lastVRow})` };
+            cell.numFmt = '#,##0';
+            cell.font = { name: FONT_FAMILY, size: 10, bold: true };
+            cell.alignment = { horizontal: "right", vertical: "middle" };
+          });
+
+          // Columna O (Km Recorrido)
+          const cellO = ws.getCell(`O${totRow}`);
+          cellO.value = { formula: `SUM(O6:O${lastVRow})` };
+          cellO.numFmt = '#,##0';
+          cellO.font = { name: FONT_FAMILY, size: 10, bold: true };
+          cellO.alignment = { horizontal: "right", vertical: "middle" };
+
+          // Columnas P a R (Costos por km totales)
+          ["P", "Q", "R"].forEach(col => {
+            const cell = ws.getCell(`${col}${totRow}`);
+            cell.value = { formula: `SUM(${col}6:${col}${lastVRow})` };
+            cell.numFmt = '#,##0.00';
+            cell.font = { name: FONT_FAMILY, size: 10, bold: true };
+            cell.alignment = { horizontal: "right", vertical: "middle" };
+          });
+
+          ws.getRow(totRow).height = 24;
+          for (let col = 1; col <= 18; col++) {
+            const c = ws.getCell(totRow, col);
+            c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: COLOR_TOTAL_BG } };
+            c.border = totalBorder;
+          }
+
+          const colWidths = [14, 30, 40, 10, 16, 20, 16, 16, 16, 16, 20, 19, 14, 14, 16, 16, 16, 18];
+          colWidths.forEach((w, idx) => {
+            ws.getColumn(idx + 1).width = w;
+          });
+        }
+
+        // --- HOJA: ACUMULADO ---
+        const wsAcum = workbook.addWorksheet("Acumulado", {
+          views: [{ showGridLines: true, state: 'frozen', xSplit: 0, ySplit: 5 }]
+        });
+
+        wsAcum.mergeCells("A1:R1");
+        const tCellAcum = wsAcum.getCell("A1");
+        tCellAcum.value = `REPORTE CONTROL DE GASTOS DE FLOTA - ACUMULADO 2026`;
+        tCellAcum.font = { name: FONT_FAMILY, size: 14, bold: true, color: { argb: "FFFFFFFF" } };
+        tCellAcum.fill = { type: "pattern", pattern: "solid", fgColor: { argb: COLOR_PRIMARY_DARK } };
+        tCellAcum.alignment = { horizontal: "center", vertical: "middle" };
+        wsAcum.getRow(1).height = 30;
+
+        wsAcum.mergeCells("A2:R2");
+        const sCellAcum = wsAcum.getCell("A2");
+        sCellAcum.value = `Consolidado Anual 2026 | OT S.A.`;
+        sCellAcum.font = { name: FONT_FAMILY, size: 10, italic: true, color: { argb: "FFFFFFFF" } };
+        sCellAcum.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF2C598C" } };
+        sCellAcum.alignment = { horizontal: "center", vertical: "middle" };
+        wsAcum.getRow(2).height = 20;
+
+        wsAcum.getRow(3).height = 8;
+
+        const headersAcum = [
+          "Matrícula", "Responsable", "Vehículo / Modelo", "Año",
+          "Combustible", "Combustible Sin Tarjeta Flota", "M. Prev.", "M. Correc.",
+          "Reparaciones", "Insumos", "Seguridad y Monitoreo", "Factura de Proveedor",
+          "Km Inicial", "Km Final", "Km Recorrido", "Costo Comb/Km", "Costo Mant/Km", "Costo Total / km"
+        ];
+        wsAcum.getRow(4).height = 28;
+        headersAcum.forEach((hText, idx) => {
+          const cell = wsAcum.getCell(4, idx + 1);
+          cell.value = hText;
+          cell.font = { name: FONT_FAMILY, size: 9, bold: true, color: { argb: "FF1F497D" } };
+          cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: COLOR_HEADER_BG } };
+          cell.alignment = { horizontal: "center", vertical: "middle", wrapText: true };
+          cell.border = thinBorder;
+        });
+
+        wsAcum.mergeCells("A5:R5");
+        const secCellAcum = wsAcum.getCell("A5");
+        secCellAcum.value = "FLOTA Y EQUIPOS OT";
+        secCellAcum.font = { name: FONT_FAMILY, size: 11, bold: true, color: { argb: "FFFFFFFF" } };
+        secCellAcum.fill = { type: "pattern", pattern: "solid", fgColor: { argb: COLOR_PRIMARY_MEDIUM } };
+        secCellAcum.alignment = { horizontal: "center", vertical: "middle" };
+        wsAcum.getRow(5).height = 22;
+        for (let col = 1; col <= 18; col++) {
+          wsAcum.getCell(5, col).border = thinBorder;
+        }
+
+        let vRowAcum = 6;
+        fleetMaster.forEach((veh, idx) => {
+          let d = {
+            combustible: 0, combustibleSinTarjeta: 0, mPrev: 0, mCorrec: 0,
+            reparaciones: 0, insumos: 0, seguridad: 0, facturaProveedor: 0,
+            kmIni: 0, kmFin: 0
+          };
+          let kmMin = Infinity, kmMax = -Infinity;
+          for (let m = 1; m <= 12; m++) {
+            const md = monthlyFleetData[m][veh.plate];
+            if (md) {
+              d.combustible += md.combustible || 0;
+              d.combustibleSinTarjeta += md.combustibleSinTarjeta || 0;
+              d.mPrev += md.mPrev || 0;
+              d.mCorrec += md.mCorrec || 0;
+              d.reparaciones += md.reparaciones || 0;
+              d.insumos += md.insumos || 0;
+              d.seguridad += md.seguridad || 0;
+              d.facturaProveedor += md.facturaProveedor || 0;
+              if (md.kmIni > 0 && md.kmIni < kmMin) kmMin = md.kmIni;
+              if (md.kmFin > 0 && md.kmFin > kmMax) kmMax = md.kmFin;
+            }
+          }
+          if (kmMin !== Infinity) d.kmIni = kmMin;
+          if (kmMax !== -Infinity) d.kmFin = kmMax;
+
+          wsAcum.getCell(`A${vRowAcum}`).value = veh.plate;
+          wsAcum.getCell(`B${vRowAcum}`).value = veh.driver || "-";
+          wsAcum.getCell(`C${vRowAcum}`).value = veh.model || "-";
+          wsAcum.getCell(`D${vRowAcum}`).value = veh.year || "-";
+
+          wsAcum.getCell(`E${vRowAcum}`).value = d.combustible;
+          wsAcum.getCell(`F${vRowAcum}`).value = d.combustibleSinTarjeta;
+          wsAcum.getCell(`G${vRowAcum}`).value = d.mPrev;
+          wsAcum.getCell(`H${vRowAcum}`).value = d.mCorrec;
+          wsAcum.getCell(`I${vRowAcum}`).value = d.reparaciones;
+          wsAcum.getCell(`J${vRowAcum}`).value = d.insumos;
+          wsAcum.getCell(`K${vRowAcum}`).value = d.seguridad;
+          wsAcum.getCell(`L${vRowAcum}`).value = d.facturaProveedor;
+
+          wsAcum.getCell(`M${vRowAcum}`).value = d.kmIni;
+          wsAcum.getCell(`N${vRowAcum}`).value = d.kmFin;
+
+          wsAcum.getCell(`O${vRowAcum}`).value = { formula: `MAX(0,N${vRowAcum}-M${vRowAcum})` };
+          wsAcum.getCell(`P${vRowAcum}`).value = { formula: `IF(O${vRowAcum}>0,(E${vRowAcum}+F${vRowAcum})/O${vRowAcum},0)` };
+          wsAcum.getCell(`Q${vRowAcum}`).value = { formula: `IF(O${vRowAcum}>0,(G${vRowAcum}+H${vRowAcum}+I${vRowAcum}+J${vRowAcum}+K${vRowAcum}+L${vRowAcum})/O${vRowAcum},0)` };
+          wsAcum.getCell(`R${vRowAcum}`).value = { formula: `P${vRowAcum}+Q${vRowAcum}` };
+
+          wsAcum.getCell(`A${vRowAcum}`).alignment = { horizontal: "center", vertical: "middle" };
+          wsAcum.getCell(`B${vRowAcum}`).alignment = { horizontal: "left", vertical: "middle" };
+          wsAcum.getCell(`C${vRowAcum}`).alignment = { horizontal: "left", vertical: "middle" };
+          wsAcum.getCell(`D${vRowAcum}`).alignment = { horizontal: "center", vertical: "middle" };
+
+          ["E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O"].forEach(col => {
+            const c = wsAcum.getCell(`${col}${vRowAcum}`);
+            c.numFmt = '#,##0';
+            c.alignment = { horizontal: "right", vertical: "middle" };
+          });
+
+          ["P", "Q", "R"].forEach(col => {
+            const c = wsAcum.getCell(`${col}${vRowAcum}`);
+            c.numFmt = '#,##0.00';
+            c.alignment = { horizontal: "right", vertical: "middle" };
+          });
+
+          for (let c = 1; c <= 18; c++) {
+            const cell = wsAcum.getCell(vRowAcum, c);
+            cell.font = { name: FONT_FAMILY, size: 9, color: { argb: "FF000000" } };
+            cell.border = thinBorder;
+            if (idx % 2 === 1) {
+              cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: COLOR_ZEBRA } };
+            }
+          }
+
+          wsAcum.getRow(vRowAcum).height = 20;
+          vRowAcum++;
+        });
+
+        const lastVRowAcum = vRowAcum - 1;
+        const totRowAcum = vRowAcum;
+
+        wsAcum.mergeCells(`A${totRowAcum}:D${totRowAcum}`);
+        const totLabelAcum = wsAcum.getCell(`A${totRowAcum}`);
+        totLabelAcum.value = "TOTAL GENERAL";
+        totLabelAcum.font = { name: FONT_FAMILY, size: 10, bold: true, color: { argb: "FF000000" } };
+        totLabelAcum.alignment = { horizontal: "center", vertical: "middle" };
+
+        ["E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O"].forEach(col => {
+          const cell = wsAcum.getCell(`${col}${totRowAcum}`);
+          cell.value = { formula: `SUM(${col}6:${col}${lastVRowAcum})` };
+          cell.numFmt = '#,##0';
+          cell.font = { name: FONT_FAMILY, size: 10, bold: true };
+          cell.alignment = { horizontal: "right", vertical: "middle" };
+        });
+
+        ["P", "Q", "R"].forEach(col => {
+          const cell = wsAcum.getCell(`${col}${totRowAcum}`);
+          cell.value = { formula: `SUM(${col}6:${col}${lastVRowAcum})` };
+          cell.numFmt = '#,##0.00';
+          cell.font = { name: FONT_FAMILY, size: 10, bold: true };
+          cell.alignment = { horizontal: "right", vertical: "middle" };
+        });
+
+        wsAcum.getRow(totRowAcum).height = 24;
+        for (let col = 1; col <= 18; col++) {
+          const c = wsAcum.getCell(totRowAcum, col);
+          c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: COLOR_TOTAL_BG } };
+          c.border = totalBorder;
+        }
+
+        const colWidthsAcum = [14, 30, 40, 10, 16, 20, 16, 16, 16, 16, 20, 19, 14, 14, 16, 16, 16, 18];
+        colWidthsAcum.forEach((w, idx) => {
+          wsAcum.getColumn(idx + 1).width = w;
+        });
+
+        const buffer = await workbook.xlsx.writeBuffer();
+        const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+        saveAs(blob, "Control_Gastos_Flota_Odoo_2026.xlsx");
+
+        updateToast("¡Archivo Excel Descargado!", "Se generó 'Control_Gastos_Flota_Odoo_2026.xlsx' con 14 hojas completas (incluyendo Acumulado).");
+      } catch (err) {
+        console.error(err);
+        updateToast("Error al exportar", "Ocurrió un detalle al procesar el archivo Excel. Revisa la consola.");
+      } finally {
+        btn.innerHTML = origText;
+        btn.disabled = false;
+        lucide.createIcons();
+      }
+    }
+
+    function normalize(text) {
+      return (text || "").toString().trim().toLowerCase()
+        .normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    }
+
+    function parseCSVDate(dateStr) {
+      if (!dateStr) return null;
+      if (dateStr instanceof Date) return dateStr;
+      
+      // Manejar fechas seriales nativas de Excel
+      if (typeof dateStr === 'number') {
+        return new Date((dateStr - (25567 + 2)) * 86400 * 1000); 
+      }
+      
+      const str = dateStr.toString().trim();
+      
+      // PRIORIZAR FORMATO LATAM (DD/MM/YYYY) PARA EVITAR CONFUSIÓN DE MESES
+      const clean = str.split(" ")[0].trim();
+      const parts = clean.split(/[-/.]/);
+      
+      if (parts.length === 3) {
+        let p0 = parseInt(parts[0], 10), p1 = parseInt(parts[1], 10), p2 = parseInt(parts[2], 10);
+        
+        if (p0 > 1000) {
+          // Formato YYYY-MM-DD
+          return new Date(p0, p1 - 1, p2);
+        } else if (p2 > 1000) {
+          // Si el día (p0) es mayor a 12, es inequívocamente DD/MM/YYYY
+          if (p0 > 12) {
+             return new Date(p2, p1 - 1, p0);
+          } 
+          // Si el mes (p1) es mayor a 12, es formato americano MM/DD/YYYY
+          else if (p1 > 12) {
+             return new Date(p2, p0 - 1, p1); 
+          } 
+          // Si ambos son <= 12 (ej. 10/05/2026), forzamos estándar Paraguay: DD/MM/YYYY
+          else {
+             return new Date(p2, p1 - 1, p0); 
+          }
+        }
+      }
+
+      // Si no cumple el patrón anterior, intentar con el motor nativo del navegador
+      const isoDate = new Date(str);
+      if (!isNaN(isoDate.getTime())) return isoDate;
+
+      return null;
+    }
+
+    // Nuevo motor avanzado de detección de monedas (Gs, USD, etc.)
+    function parseAmount(val) {
+      if (val === null || val === undefined || val === '') return 0;
+      if (typeof val === "number") return val; 
+      
+      let s = val.toString().trim();
+      // Limpiar letras, símbolos ($ o Gs)
+      s = s.replace(/[^\d.,-]/g, '');
+      if (s === "") return 0;
+      
+      const lastDot = s.lastIndexOf('.');
+      const lastComma = s.lastIndexOf(',');
+      
+      if (lastDot > -1 && lastComma > -1) {
+          if (lastComma > lastDot) {
+              // Gs. 1.000.000,50
+              s = s.replace(/\./g, "").replace(",", ".");
+          } else {
+              // $ 1,000,000.50
+              s = s.replace(/,/g, "");
+          }
+      } else if (lastComma > -1) {
+          const parts = s.split(",");
+          if (parts[parts.length - 1].length <= 2) {
+             s = s.replace(",", "."); 
+          } else {
+             s = s.replace(/,/g, ""); 
+          }
+      } else if (lastDot > -1) {
+          const parts = s.split(".");
+          if (parts[parts.length - 1].length === 3) {
+             s = s.replace(/\./g, ""); 
+          }
+      }
+      
+      const parsed = parseFloat(s);
+      return isNaN(parsed) ? 0 : parsed;
+    }
+
+    // Detectar si el CSV se separó con comas o puntos y comas
+    function detectDelimiter(text) {
+        const firstLine = text.split('\n')[0];
+        const commas = (firstLine.match(/,/g) || []).length;
+        const semicolons = (firstLine.match(/;/g) || []).length;
+        return semicolons > commas ? ';' : ',';
+    }
+
+    // Analizador CSV blindado (lee correctamente comillas, saltos de línea internos y números complejos)
+    function parseCSVFull(text) {
+        const delimiter = detectDelimiter(text);
+        let ret = [[]];
+        let inQuote = false;
+        let value = "";
+        let row = 0;
+        
+        for (let i = 0; i < text.length; i++) {
+            let char = text[i];
+            
+            if (inQuote) {
+                if (char === '"') {
+                    if (i + 1 < text.length && text[i+1] === '"') {
+                        value += '"'; // Comillas dobles escapadas
+                        i++;
+                    } else {
+                        inQuote = false;
+                    }
+                } else {
+                    value += char;
+                }
+            } else {
+                if (char === '"') {
+                    inQuote = true;
+                } else if (char === delimiter) {
+                    ret[row].push(value.trim());
+                    value = "";
+                } else if (char === '\n') {
+                    ret[row].push(value.trim());
+                    value = "";
+                    ret.push([]);
+                    row++;
+                } else if (char === '\r') {
+                    // Ignorar el retorno de carro clásico
+                } else {
+                    value += char;
+                }
+            }
+        }
+        if (value !== "") ret[row].push(value.trim());
+        // Limpiar filas vacías residuales
+        return ret.filter(r => r.length > 1 || (r.length === 1 && r[0] !== ""));
+    }
+
+    // Función que procesa los datos limpios en el Dashboard
+    function processParsedData(rows) {
+        if (!rows || rows.length < 2) {
+            updateToast("Error", "El documento parece estar vacío o no tiene encabezados válidos.");
+            return;
+        }
+
+        const headers = rows[0].map(h => normalize(h));
+
+        // Búsqueda inteligente de columnas
+        const idxPlate = headers.findIndex(h => h.includes("matricula") || h.includes("placa") || h.includes("license") || h.includes("vehiculo") || h.includes("chapa") || h.includes("patente") || h.includes("equipo"));
+        const idxDriver = headers.findIndex(h => h.includes("responsable") || h.includes("conductor") || h.includes("driver") || h.includes("chofer") || h.includes("operador"));
+        const idxModel = headers.findIndex(h => h.includes("modelo") || h.includes("vehiculo") || h.includes("model") || h.includes("marca"));
+        const idxYear = headers.findIndex(h => h.includes("ano") || h.includes("year"));
+        const idxService = headers.findIndex(h => h.includes("servicio") || h.includes("service") || h.includes("tipo") || h.includes("categoria") || h.includes("concepto") || h.includes("producto") || h.includes("descripcion") || h.includes("detalle") || h.includes("item"));
+        const idxDate = headers.findIndex(h => h.includes("fecha") || h.includes("date") || h.includes("emision") || h.includes("mes"));
+        const idxAmount = headers.findIndex(h => h.includes("importe") || h.includes("monto") || h.includes("total") || h.includes("amount") || h.includes("costo") || h.includes("valor") || h.includes("precio") || h.includes("pagado") || h.includes("gasto"));
+        const idxOdo = headers.findIndex(h => h.includes("km") || h.includes("kilometraje") || h.includes("odometer") || h.includes("odometro"));
+
+        if (idxPlate === -1) {
+          updateToast("Atención: Encabezado no encontrado", "Asegúrate de que la primera fila del documento contenga una columna 'Matrícula', 'Vehículo' o 'Placa'.");
+          return;
+        }
+
+        const newFleet = {};
+        const newMonthlyData = {};
+        for (let m = 1; m <= 12; m++) newMonthlyData[m] = {};
+
+        for (let i = 1; i < rows.length; i++) {
+          let row = rows[i];
+          const plate = (row[idxPlate] || "").toUpperCase();
+          if (!plate) continue;
+
+          const driver = idxDriver !== -1 ? (row[idxDriver] || "-") : "-";
+          const model = idxModel !== -1 ? (row[idxModel] || "Vehículo Operativo") : "Vehículo Operativo";
+          const year = idxYear !== -1 ? (row[idxYear] || "-") : "-";
+
+          if (!newFleet[plate]) {
+            newFleet[plate] = { plate, driver, model, year };
+          }
+
+          const rawDate = idxDate !== -1 ? row[idxDate] : "";
+          const dt = parseCSVDate(rawDate);
+          const month = dt ? (dt.getMonth() + 1) : 1;
+
+          if (!newMonthlyData[month][plate]) {
+            newMonthlyData[month][plate] = {
+              combustible: 0, combustibleSinTarjeta: 0, mPrev: 0, mCorrec: 0,
+              reparaciones: 0, insumos: 0, seguridad: 0, facturaProveedor: 0,
+              kmIni: 0, kmFin: 0, kms: []
+            };
+          }
+
+          const serv = idxService !== -1 ? normalize(row[idxService]) : "";
+          const amt = idxAmount !== -1 ? parseAmount(row[idxAmount]) : 0;
+
+          // Asignación estricta al catálogo
+          if (serv.includes("sin tarjeta") || serv.includes("caja chica") || serv.includes("efectivo")) {
+            newMonthlyData[month][plate].combustibleSinTarjeta += amt;
+          } else if (serv.includes("combustible") || serv.includes("nafta") || serv.includes("diesel") || serv.includes("gasoil") || serv.includes("gasolina")) {
+            newMonthlyData[month][plate].combustible += amt;
+          } else if (serv.includes("preventivo") || serv.includes("filtro") || serv.includes("aceite") || serv.includes("programado")) {
+            newMonthlyData[month][plate].mPrev += amt;
+          } else if (serv.includes("correctivo") || serv.includes("repuesto") || serv.includes("bateria") || serv.includes("freno")) {
+            newMonthlyData[month][plate].mCorrec += amt;
+          } else if (serv.includes("taller") || serv.includes("reparacion") || serv.includes("mecanico")) {
+            newMonthlyData[month][plate].reparaciones += amt;
+          } else if (serv.includes("insumo") || serv.includes("gomeria") || serv.includes("lavado") || serv.includes("neumatico") || serv.includes("cubierta")) {
+            newMonthlyData[month][plate].insumos += amt;
+          } else if (serv.includes("seguridad") || serv.includes("gps") || serv.includes("monitoreo") || serv.includes("rastreo")) {
+            newMonthlyData[month][plate].seguridad += amt;
+          } else {
+            newMonthlyData[month][plate].facturaProveedor += amt;
+          }
+
+          if (idxOdo !== -1) {
+            const odo = parseAmount(row[idxOdo]);
+            if (odo > 0) newMonthlyData[month][plate].kms.push(odo);
+          }
+        }
+
+        // Determinar odómetros iniciales y finales de cada mes
+        for (let m = 1; m <= 12; m++) {
+          Object.keys(newMonthlyData[m]).forEach(plt => {
+            const arr = newMonthlyData[m][plt].kms;
+            if (arr && arr.length > 0) {
+              newMonthlyData[m][plt].kmIni = Math.min(...arr);
+              newMonthlyData[m][plt].kmFin = Math.max(...arr);
+            }
+          });
+        }
+
+        // Actualizar variables maestras
+        fleetMaster = Object.values(newFleet).sort((a, b) => a.plate.localeCompare(b.plate));
+        monthlyFleetData = newMonthlyData;
+
+        // Feedback al usuario en Toast
+        const colsRead = [
+            idxAmount !== -1 ? "Monto" : "",
+            idxService !== -1 ? "Concepto" : "",
+            idxDate !== -1 ? "Fecha" : "",
+            idxOdo !== -1 ? "Odómetro" : ""
+        ].filter(Boolean).join(", ");
+        
+        const warningAmount = idxAmount === -1 ? ". ATENCIÓN: No detectamos la columna 'Importe'. Verifica el nombre." : "";
+
+        updateToast("Carga Exitosa desde la Nube", `Se sincronizaron ${fleetMaster.length} vehículos y sus movimientos financieros. (Columnas procesadas: ${colsRead})${warningAmount}`);
+        updateDashboardView();
+        renderTabs();
+        renderPreview();
+    }
+
+    function handleCSVUpload(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = function(evt) {
+        const text = evt.target.result;
+        const rows = parseCSVFull(text);
+        processParsedData(rows);
+      };
+      reader.readAsText(file);
+    }
+
+    function updateToast(title, desc) {
+      document.getElementById("toastTitle").textContent = title;
+      document.getElementById("toastDesc").textContent = desc;
+      document.getElementById("statusToast").style.display = 'flex';
+    }
+
+    document.getElementById("btnDownloadExcel").addEventListener("click", generateAndDownloadExcel);
+    document.getElementById("btnQuickExport").addEventListener("click", generateAndDownloadExcel);
+    document.getElementById("csvFileInput").addEventListener("change", handleCSVUpload);
+
+    document.getElementById("btnOpenDriveModal").addEventListener("click", () => {
+      document.getElementById("driveModal").classList.remove("hidden");
+    });
+
+    document.getElementById("btnLoadDrive").addEventListener("click", async () => {
+      const url = document.getElementById("driveUrlInput").value.trim();
+      if (!url) {
+        updateToast("Enlace Requerido", "Por favor, ingresa una URL válida de Google Sheets.");
+        return;
+      }
+      
+      const btn = document.getElementById("btnLoadDrive");
+      const origText = btn.textContent;
+      btn.textContent = "Cargando...";
+      btn.disabled = true;
+
+      try {
+        // Extraer el ID único del Google Sheet
+        const match = url.match(/\/d\/([a-zA-Z0-9-_]+)/);
+        let fileId = match ? match[1] : null;
+
+        if (!fileId) {
+            updateToast("URL Inválida", "No se encontró el ID del documento. Pega el enlace completo.");
+            throw new Error("Invalid URL");
+        }
+
+        // Utilizamos la API nativa y veloz de Google (Soporta CORS directo si está público)
+        const gvizUrl = `https://docs.google.com/spreadsheets/d/${fileId}/gviz/tq?tqx=out:csv`;
+        let text = "";
+
+        try {
+            // Intento 1: Conexión nativa limpia sin proxies
+            const res = await fetch(gvizUrl);
+            if (!res.ok) throw new Error("Acceso directo denegado o bloqueado");
+            text = await res.text();
+        } catch (e) {
+            console.warn("Intento directo bloqueado por CORS. Recurriendo al túnel de rescate...", e);
+            // Intento 2: Conexión mediante puente proxy si el navegador estricto lo rechaza
+            const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(gvizUrl)}&nocache=${Date.now()}`;
+            const proxyRes = await fetch(proxyUrl);
+            if (!proxyRes.ok) throw new Error("Fallo en la comunicación del servidor proxy");
+            text = await proxyRes.text();
+        }
+        
+        // Comprobar si Google respondió con un inicio de sesión en lugar del CSV
+        if (text.trim().toLowerCase().startsWith("<!doctype") || text.trim().toLowerCase().startsWith("<html")) {
+            updateToast("Documento Protegido", "Tu Google Sheets es privado. Cambia los permisos a 'Cualquier usuario que tenga el vínculo' (Lector).");
+            throw new Error("Private document HTML returned");
+        }
+        
+        // Limpiar cabeceras invisibles BOM que Google puede insertar
+        text = text.replace(/^\uFEFF/, '');
+        
+        // Procesar matemáticamente e inyectar al dashboard
+        const rows = parseCSVFull(text);
+        processParsedData(rows);
+        
+        document.getElementById('driveModal').classList.add('hidden');
+        document.getElementById("driveUrlInput").value = "";
+      } catch (error) {
+        console.error("Error Obteniendo Datos Nube:", error);
+        updateToast("Error en la extracción", "Asegúrate de que el documento no sea privado y de tener conexión estable.");
+      } finally {
+        btn.textContent = origText;
+        btn.disabled = false;
+      }
+    });
+
+    // Iniciar con datos limpios 
+    fleetMaster = [];
+    monthlyFleetData = {};
+    for (let m = 1; m <= 12; m++) {
+      monthlyFleetData[m] = {};
+    }
+
+    // Renderizado inicial (Panel Blanco, 0 km, Gs. 0)
+    updateDashboardView();
+    renderTabs();
+    renderPreview();
+    lucide.createIcons();
+  </script>
+</body>
+</html>
