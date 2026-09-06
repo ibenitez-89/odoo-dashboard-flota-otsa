@@ -66,6 +66,11 @@
           </button>
         </div>
 
+        <button id="btnOpenOdooModal" class="inline-flex items-center gap-1.5 px-3 py-2 bg-purple-600 hover:bg-purple-500 active:bg-purple-700 text-white text-xs font-semibold rounded-lg shadow-sm transition border border-purple-500/50">
+          <i data-lucide="database" class="w-4 h-4"></i>
+          <span class="hidden sm:inline">Conectar Odoo</span>
+        </button>
+
         <label for="csvFileInput" class="inline-flex items-center gap-1.5 px-3 py-2 bg-white/15 hover:bg-white/25 text-white text-xs font-semibold rounded-lg cursor-pointer transition border border-white/20">
           <i data-lucide="upload-cloud" class="w-4 h-4"></i>
           <span class="hidden sm:inline">Cargar Archivo (CSV/Excel)</span>
@@ -98,6 +103,44 @@
       <div class="flex justify-end gap-2 pt-2">
         <button onclick="document.getElementById('driveModal').classList.add('hidden')" class="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg transition">Cancelar</button>
         <button id="btnLoadDrive" class="px-4 py-2 text-xs font-bold text-white bg-sky-600 hover:bg-sky-700 rounded-lg transition">Cargar Datos</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal Conexión Odoo Directa -->
+  <div id="odooModal" class="hidden fixed inset-0 bg-slate-900/50 z-[60] flex items-center justify-center p-4">
+    <div class="bg-white rounded-xl shadow-xl max-w-md w-full p-5 space-y-4">
+      <h3 class="text-lg font-bold text-slate-800 flex items-center gap-2">
+        <i data-lucide="database" class="w-5 h-5 text-purple-600"></i> Conexión Directa a Odoo (API)
+      </h3>
+      <p class="text-[11px] text-slate-500 leading-relaxed bg-amber-50 p-2 rounded border border-amber-200">
+        <strong class="text-amber-800">Advertencia:</strong> Para que esto funcione, tu servidor Odoo debe tener habilitado CORS para <code>github.io</code>. Las credenciales no se guardan en ningún servidor, solo en tu sesión actual.
+      </p>
+      
+      <div class="space-y-3">
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 mb-1">URL de Odoo (ej: https://tudominio.odoo.com)</label>
+          <input type="url" id="odooUrlInput" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500">
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 mb-1">Nombre de la Base de Datos</label>
+          <input type="text" id="odooDbInput" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500">
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 mb-1">Usuario (Email)</label>
+          <input type="email" id="odooUserInput" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500">
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 mb-1">Contraseña o API Key</label>
+          <input type="password" id="odooPassInput" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500">
+        </div>
+      </div>
+
+      <div class="flex justify-end gap-2 pt-2 border-t border-slate-100 mt-4 pt-4">
+        <button onclick="document.getElementById('odooModal').classList.add('hidden')" class="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg transition">Cancelar</button>
+        <button id="btnFetchOdoo" class="px-4 py-2 text-xs font-bold text-white bg-purple-600 hover:bg-purple-700 rounded-lg transition flex items-center gap-2">
+          <span>Extraer Gastos</span>
+        </button>
       </div>
     </div>
   </div>
@@ -305,7 +348,6 @@
 
     const DAYS_IN_MONTH_2026 = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
 
-    // Datos iniciales vacíos para que no muestre meses sin registros
     let fleetMaster = [];
     let monthlyFleetData = {};
     for (let m = 1; m <= 12; m++) {
@@ -1168,14 +1210,11 @@
       if (!dateStr) return null;
       if (dateStr instanceof Date) return dateStr;
       
-      // Manejar fechas seriales nativas de Excel
       if (typeof dateStr === 'number') {
         return new Date((dateStr - (25567 + 2)) * 86400 * 1000); 
       }
       
       const str = dateStr.toString().trim();
-      
-      // PRIORIZAR FORMATO LATAM (DD/MM/YYYY) PARA EVITAR CONFUSIÓN DE MESES
       const clean = str.split(" ")[0].trim();
       const parts = clean.split(/[-/.]/);
       
@@ -1183,38 +1222,27 @@
         let p0 = parseInt(parts[0], 10), p1 = parseInt(parts[1], 10), p2 = parseInt(parts[2], 10);
         
         if (p0 > 1000) {
-          // Formato YYYY-MM-DD
-          return new Date(p0, p1 - 1, p2);
+          return new Date(p0, p1 - 1, p2); // YYYY-MM-DD
         } else if (p2 > 1000) {
-          // Si el día (p0) es mayor a 12, es inequívocamente DD/MM/YYYY
-          if (p0 > 12) {
-             return new Date(p2, p1 - 1, p0);
-          } 
-          // Si el mes (p1) es mayor a 12, es formato americano MM/DD/YYYY
-          else if (p1 > 12) {
-             return new Date(p2, p0 - 1, p1); 
-          } 
-          // Si ambos son <= 12 (ej. 10/05/2026), forzamos estándar Paraguay: DD/MM/YYYY
-          else {
-             return new Date(p2, p1 - 1, p0); 
+          if (p1 > 12) {
+             return new Date(p2, p0 - 1, p1); // MM/DD/YYYY
+          } else {
+             return new Date(p2, p1 - 1, p0); // DD/MM/YYYY (Paraguay Standard)
           }
         }
       }
 
-      // Si no cumple el patrón anterior, intentar con el motor nativo del navegador
       const isoDate = new Date(str);
       if (!isNaN(isoDate.getTime())) return isoDate;
 
       return null;
     }
 
-    // Nuevo motor avanzado de detección de monedas (Gs, USD, etc.)
     function parseAmount(val) {
       if (val === null || val === undefined || val === '') return 0;
       if (typeof val === "number") return val; 
       
       let s = val.toString().trim();
-      // Limpiar letras, símbolos ($ o Gs)
       s = s.replace(/[^\d.,-]/g, '');
       if (s === "") return 0;
       
@@ -1223,10 +1251,8 @@
       
       if (lastDot > -1 && lastComma > -1) {
           if (lastComma > lastDot) {
-              // Gs. 1.000.000,50
               s = s.replace(/\./g, "").replace(",", ".");
           } else {
-              // $ 1,000,000.50
               s = s.replace(/,/g, "");
           }
       } else if (lastComma > -1) {
@@ -1247,7 +1273,6 @@
       return isNaN(parsed) ? 0 : parsed;
     }
 
-    // Detectar si el CSV se separó con comas o puntos y comas
     function detectDelimiter(text) {
         const firstLine = text.split('\n')[0];
         const commas = (firstLine.match(/,/g) || []).length;
@@ -1255,7 +1280,6 @@
         return semicolons > commas ? ';' : ',';
     }
 
-    // Analizador CSV blindado (lee correctamente comillas, saltos de línea internos y números complejos)
     function parseCSVFull(text) {
         const delimiter = detectDelimiter(text);
         let ret = [[]];
@@ -1265,11 +1289,10 @@
         
         for (let i = 0; i < text.length; i++) {
             let char = text[i];
-            
             if (inQuote) {
                 if (char === '"') {
                     if (i + 1 < text.length && text[i+1] === '"') {
-                        value += '"'; // Comillas dobles escapadas
+                        value += '"';
                         i++;
                     } else {
                         inQuote = false;
@@ -1289,18 +1312,15 @@
                     ret.push([]);
                     row++;
                 } else if (char === '\r') {
-                    // Ignorar el retorno de carro clásico
                 } else {
                     value += char;
                 }
             }
         }
         if (value !== "") ret[row].push(value.trim());
-        // Limpiar filas vacías residuales
         return ret.filter(r => r.length > 1 || (r.length === 1 && r[0] !== ""));
     }
 
-    // Función que procesa los datos limpios en el Dashboard
     function processParsedData(rows) {
         if (!rows || rows.length < 2) {
             updateToast("Error", "El documento parece estar vacío o no tiene encabezados válidos.");
@@ -1309,7 +1329,6 @@
 
         const headers = rows[0].map(h => normalize(h));
 
-        // Búsqueda inteligente de columnas
         const idxPlate = headers.findIndex(h => h.includes("matricula") || h.includes("placa") || h.includes("license") || h.includes("vehiculo") || h.includes("chapa") || h.includes("patente") || h.includes("equipo"));
         const idxDriver = headers.findIndex(h => h.includes("responsable") || h.includes("conductor") || h.includes("driver") || h.includes("chofer") || h.includes("operador"));
         const idxModel = headers.findIndex(h => h.includes("modelo") || h.includes("vehiculo") || h.includes("model") || h.includes("marca"));
@@ -1356,7 +1375,6 @@
           const serv = idxService !== -1 ? normalize(row[idxService]) : "";
           const amt = idxAmount !== -1 ? parseAmount(row[idxAmount]) : 0;
 
-          // Asignación estricta al catálogo
           if (serv.includes("sin tarjeta") || serv.includes("caja chica") || serv.includes("efectivo")) {
             newMonthlyData[month][plate].combustibleSinTarjeta += amt;
           } else if (serv.includes("combustible") || serv.includes("nafta") || serv.includes("diesel") || serv.includes("gasoil") || serv.includes("gasolina")) {
@@ -1381,7 +1399,6 @@
           }
         }
 
-        // Determinar odómetros iniciales y finales de cada mes
         for (let m = 1; m <= 12; m++) {
           Object.keys(newMonthlyData[m]).forEach(plt => {
             const arr = newMonthlyData[m][plt].kms;
@@ -1392,11 +1409,9 @@
           });
         }
 
-        // Actualizar variables maestras
         fleetMaster = Object.values(newFleet).sort((a, b) => a.plate.localeCompare(b.plate));
         monthlyFleetData = newMonthlyData;
 
-        // Feedback al usuario en Toast
         const colsRead = [
             idxAmount !== -1 ? "Monto" : "",
             idxService !== -1 ? "Concepto" : "",
@@ -1406,7 +1421,7 @@
         
         const warningAmount = idxAmount === -1 ? ". ATENCIÓN: No detectamos la columna 'Importe'. Verifica el nombre." : "";
 
-        updateToast("Carga Exitosa desde la Nube", `Se sincronizaron ${fleetMaster.length} vehículos y sus movimientos financieros. (Columnas procesadas: ${colsRead})${warningAmount}`);
+        updateToast("Carga Exitosa", `Se sincronizaron ${fleetMaster.length} vehículos y sus movimientos financieros. (Columnas procesadas: ${colsRead})${warningAmount}`);
         updateDashboardView();
         renderTabs();
         renderPreview();
@@ -1439,6 +1454,132 @@
       document.getElementById("driveModal").classList.remove("hidden");
     });
 
+    document.getElementById("btnOpenOdooModal").addEventListener("click", () => {
+      document.getElementById("odooModal").classList.remove("hidden");
+    });
+
+    // Lógica de conexión a Odoo (JSON-RPC)
+    document.getElementById("btnFetchOdoo").addEventListener("click", async () => {
+      const url = document.getElementById("odooUrlInput").value.trim().replace(/\/$/, "");
+      const db = document.getElementById("odooDbInput").value.trim();
+      const user = document.getElementById("odooUserInput").value.trim();
+      const pass = document.getElementById("odooPassInput").value.trim();
+
+      if (!url || !db || !user || !pass) {
+        updateToast("Campos incompletos", "Por favor completa todos los datos para conectar con Odoo.");
+        return;
+      }
+
+      const btn = document.getElementById("btnFetchOdoo");
+      const origText = btn.innerHTML;
+      btn.innerHTML = `<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i><span>Conectando...</span>`;
+      btn.disabled = true;
+
+      try {
+        // 1. Autenticación (Login)
+        const authRes = await fetch(`${url}/jsonrpc`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                jsonrpc: "2.0",
+                method: "call",
+                params: {
+                    service: "common",
+                    method: "login",
+                    args: [db, user, pass]
+                },
+                id: Math.floor(Math.random() * 1000)
+            })
+        });
+
+        if (!authRes.ok) throw new Error("CORS o Servidor no accesible");
+        const authData = await authRes.json();
+        const uid = authData.result;
+
+        if (!uid) {
+            updateToast("Error de Login", "Credenciales incorrectas o base de datos no encontrada.");
+            throw new Error("Fallo en la autenticación con Odoo");
+        }
+
+        // 2. Extraer Gastos (Modelo: fleet.vehicle.cost) - Solo del año actual
+        const currentYear = new Date().getFullYear();
+        const searchRes = await fetch(`${url}/jsonrpc`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                jsonrpc: "2.0",
+                method: "call",
+                params: {
+                    service: "object",
+                    method: "execute_kw",
+                    args: [
+                        db, uid, pass,
+                        "fleet.vehicle.log.services", // Modelo de servicios/gastos de flota en Odoo 15+
+                        "search_read",
+                        [[["date", ">=", `${currentYear}-01-01`]]],
+                        { 
+                          "fields": ["vehicle_id", "amount", "date", "description", "cost_subtype_id", "odometer"], 
+                          "limit": 5000 
+                        }
+                    ]
+                },
+                id: Math.floor(Math.random() * 1000)
+            })
+        });
+
+        const searchData = await searchRes.json();
+        if (searchData.error) throw new Error(searchData.error.data.message);
+        const odooRecords = searchData.result;
+
+        if (!odooRecords || odooRecords.length === 0) {
+            updateToast("Sin Datos", `La conexión fue exitosa, pero no se encontraron gastos de flota para el año ${currentYear}.`);
+            document.getElementById('odooModal').classList.add('hidden');
+            return;
+        }
+
+        // 3. Transformar formato Odoo a matriz compatible con processParsedData
+        let rows = [["Matrícula", "Conductor", "Modelo", "Año", "Fecha", "Servicio", "Importe", "Odómetro"]];
+        
+        odooRecords.forEach(record => {
+            const vehicleName = record.vehicle_id ? record.vehicle_id[1] : "Desconocido";
+            // Intentar extraer matrícula (suele estar entre corchetes o al inicio en Odoo)
+            let plate = vehicleName.includes("/") ? vehicleName.split("/")[0].trim() : vehicleName;
+            
+            const serviceType = record.cost_subtype_id ? record.cost_subtype_id[1] : record.description;
+            
+            rows.push([
+                plate, 
+                "Odoo User", 
+                vehicleName, 
+                "-", 
+                record.date || "", 
+                serviceType || "Gasto Genérico", 
+                record.amount || 0,
+                record.odometer || 0
+            ]);
+        });
+
+        // 4. Inyectar datos al dashboard
+        processParsedData(rows);
+        updateToast("¡Conexión Odoo Exitosa!", `Se extrajeron ${odooRecords.length} registros directamente de tu servidor Odoo.`);
+        document.getElementById('odooModal').classList.add('hidden');
+
+      } catch (error) {
+        // En lugar de console.error (que dispara alertas en la previsualización), usamos console.warn
+        console.warn("Intento de conexión a Odoo bloqueado o fallido:", error.message);
+        
+        if (error.name === "TypeError" && error.message === "Failed to fetch") {
+            updateToast("Bloqueo de Seguridad (CORS)", "Odoo bloqueó la conexión (CORS). Tu administrador de sistemas debe instalar el módulo CORS en Odoo y permitir el acceso a este dominio.");
+        } else {
+            updateToast("Fallo de Conexión", error.message);
+        }
+      } finally {
+        btn.innerHTML = origText;
+        btn.disabled = false;
+        lucide.createIcons();
+      }
+    });
+
     document.getElementById("btnLoadDrive").addEventListener("click", async () => {
       const url = document.getElementById("driveUrlInput").value.trim();
       if (!url) {
@@ -1452,7 +1593,6 @@
       btn.disabled = true;
 
       try {
-        // Extraer el ID único del Google Sheet
         const match = url.match(/\/d\/([a-zA-Z0-9-_]+)/);
         let fileId = match ? match[1] : null;
 
@@ -1461,34 +1601,37 @@
             throw new Error("Invalid URL");
         }
 
-        // Utilizamos la API nativa y veloz de Google (Soporta CORS directo si está público)
-        const gvizUrl = `https://docs.google.com/spreadsheets/d/${fileId}/gviz/tq?tqx=out:csv`;
+        const exportUrl = `https://docs.google.com/spreadsheets/d/${fileId}/export?format=csv`;
         let text = "";
 
-        try {
-            // Intento 1: Conexión nativa limpia sin proxies
-            const res = await fetch(gvizUrl);
-            if (!res.ok) throw new Error("Acceso directo denegado o bloqueado");
-            text = await res.text();
-        } catch (e) {
-            console.warn("Intento directo bloqueado por CORS. Recurriendo al túnel de rescate...", e);
-            // Intento 2: Conexión mediante puente proxy si el navegador estricto lo rechaza
-            const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(gvizUrl)}&nocache=${Date.now()}`;
-            const proxyRes = await fetch(proxyUrl);
-            if (!proxyRes.ok) throw new Error("Fallo en la comunicación del servidor proxy");
-            text = await proxyRes.text();
+        const proxyUrls = [
+            `https://api.allorigins.win/raw?url=${encodeURIComponent(exportUrl)}&nocache=${Date.now()}`,
+            `https://corsproxy.io/?${encodeURIComponent(exportUrl)}`,
+            exportUrl 
+        ];
+
+        let success = false;
+        for (const pUrl of proxyUrls) {
+            try {
+                const res = await fetch(pUrl);
+                if (res.ok) {
+                    text = await res.text();
+                    if (!text.trim().toLowerCase().startsWith("<!doctype") && !text.trim().toLowerCase().startsWith("<html")) {
+                        success = true;
+                        break; 
+                    }
+                }
+            } catch (e) {
+                console.warn("Fallo intento de proxy:", pUrl);
+            }
+        }
+
+        if (!success || text.trim() === "") {
+             updateToast("Documento Protegido", "Tu Google Sheets es privado o la red falló. Cambia los permisos a 'Cualquier usuario que tenga el vínculo' (Lector).");
+             throw new Error("No se pudo obtener el CSV (Private o Error de red)");
         }
         
-        // Comprobar si Google respondió con un inicio de sesión en lugar del CSV
-        if (text.trim().toLowerCase().startsWith("<!doctype") || text.trim().toLowerCase().startsWith("<html")) {
-            updateToast("Documento Protegido", "Tu Google Sheets es privado. Cambia los permisos a 'Cualquier usuario que tenga el vínculo' (Lector).");
-            throw new Error("Private document HTML returned");
-        }
-        
-        // Limpiar cabeceras invisibles BOM que Google puede insertar
         text = text.replace(/^\uFEFF/, '');
-        
-        // Procesar matemáticamente e inyectar al dashboard
         const rows = parseCSVFull(text);
         processParsedData(rows);
         
@@ -1496,21 +1639,12 @@
         document.getElementById("driveUrlInput").value = "";
       } catch (error) {
         console.error("Error Obteniendo Datos Nube:", error);
-        updateToast("Error en la extracción", "Asegúrate de que el documento no sea privado y de tener conexión estable.");
       } finally {
         btn.textContent = origText;
         btn.disabled = false;
       }
     });
 
-    // Iniciar con datos limpios 
-    fleetMaster = [];
-    monthlyFleetData = {};
-    for (let m = 1; m <= 12; m++) {
-      monthlyFleetData[m] = {};
-    }
-
-    // Renderizado inicial (Panel Blanco, 0 km, Gs. 0)
     updateDashboardView();
     renderTabs();
     renderPreview();
